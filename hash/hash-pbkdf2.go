@@ -17,7 +17,7 @@ PBKDF2 is an algorithm to derive a cryptographic key from a password and salt.
   https://en.wikipedia.org/wiki/Password_policy#NIST_guidelines
   https://pages.nist.gov/800-63-3/
   https://en.wikipedia.org/wiki/Key_derivation_function
-This implementation uses SHA3-512 as its hashing function. 
+This implementation uses HMAC-SHA3-512 as its hashing function. 
 
 go hash-pbkdf2.go <password> <salt> <iterations>
     Supported encodings for password, salt and output key:
