@@ -2,4 +2,4 @@ A set of simple servers and utilities for server implementations. These implemen
 
 [URL echo server](/echo-server/)  
 [secret hash functions](/hash/)  
-
+[static file server](/static-file-server/)
