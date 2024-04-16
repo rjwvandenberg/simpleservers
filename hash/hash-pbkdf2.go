@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"strconv"
 
@@ -40,7 +41,7 @@ func main() {
 		usageAndExit("error: could not derive key")
 	}
 
-	println(key)
+	log.Println(key)
 }
 
 func DeriveKey(password []byte, salt []byte, iter int) ([]byte, error) {
@@ -68,7 +69,7 @@ func DeriveKeyBase64(password string, salt string, iter int) (string, error) {
 }
 
 func usageAndExit(errorMessage string) {
-	println(errorMessage)
-	println(usage)
+	log.Println(errorMessage)
+	log.Println(usage)
 	os.Exit(1)
 }
