@@ -1,0 +1,31 @@
+name: Publish simpleservers
+
+on:
+  push:
+    tags:
+    - 'v0.[0-9]+.[0-9]+'
+  workflow_dispatch:
+  
+jobs:
+  build-servers:
+    runs-on: ubuntu-latest
+    #defaults:
+    #  run:
+    #    working-directory: ./build
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # https://github.com/actions/setup-go/
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22.2'
+
+      - name: Log into ghcr.io
+        uses: docker/login-action@343f7c4344506bcbf9b4de18042ae17996df046d # v3.0.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # todo: build and push 
