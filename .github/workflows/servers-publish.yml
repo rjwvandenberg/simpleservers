@@ -9,6 +9,17 @@ on:
 jobs:
   build-servers:
     runs-on: ubuntu-latest
+
+    # howto: https://docs.github.com/en/actions/security-guides/automatic-token-authentication#modifying-the-permissions-for-the-github_token
+    # publish specifi: https://docs.github.com/en/actions/publishing-packages/publishing-docker-images
+    # permission keys: https://docs.github.com/en/actions/using-jobs/assigning-permissions-to-jobs
+    # by default only read permissions are enabled on the repo, need to allow pushing with the GITHUB_TOKEN
+    # the permission defaults are reset when using the permission key, so need to reenable read
+    permissions:
+      contents: read
+      packages: write
+
+
     #defaults:
     #  run:
     #    working-directory: ./build
