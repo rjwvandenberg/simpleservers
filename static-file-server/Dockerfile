@@ -13,4 +13,5 @@ FROM gcr.io/distroless/static:latest
 WORKDIR /bin
 COPY --from=build /build/artifacts/server /bin/
 COPY testfiles/index.html /www/
+COPY testfiles/index.html /www/static/
 CMD ["/bin/server", "8080", "/www"]
