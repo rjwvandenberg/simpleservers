@@ -72,11 +72,11 @@ func main() {
 				// indexString available on /<path>/   (not for path="/", root //)
 				if dir != "/" {
 					cache[dir+"/"] = v
-					log.Printf("cached %v for %v", dir, indexString)
+					log.Printf("cached %v/ for %v", dir, indexString)
 				}
 				// indexString available on /<path>
-				cache[dir+"/"] = v
-				log.Printf("cached %v/ for %v", dir, indexString)
+				cache[dir] = v
+				log.Printf("cached %v for %v", dir, indexString)
 			}
 		}
 	}
