@@ -52,7 +52,7 @@ jobs:
           file: static-file-server/Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: rjwvandenberg/static-file-server:latest
+          tags: ghcr.io/rjwvandenberg/static-file-server:latest
 
       #- name: Build static-file-server:latest image
       #  run: docker build -t ghcr.io/rjwvandenberg/static-file-server:latest -f static-file-server/Dockerfile .
