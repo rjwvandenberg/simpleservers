@@ -55,8 +55,8 @@ func getHandlers() map[string]webhookValidationHandler {
 	defer os.Clearenv()
 
 	for _, ev := range os.Environ() {
-		if split := strings.Split(ev, "="); split[0] == "SECRETS" {
-			return processSecrets(strings.Split(split[1], ","))
+		if s, found := strings.CutPrefix(ev, "SECRETS="); found {
+			return processSecrets(strings.Split(s, ","))
 		}
 	}
 
