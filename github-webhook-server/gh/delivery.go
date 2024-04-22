@@ -2,7 +2,6 @@ package gh
 
 import (
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -70,27 +69,18 @@ func (d *Delivery) VerifyHeader() bool {
 }
 
 func (d *Delivery) ReadBody() bool {
-	var totalBytesRead int64 = 0
-	bodybuffer := make([]byte, MaxBodyLength)
-	var err error
-	for err != io.EOF && totalBytesRead < d.req.ContentLength { // at read==contentlength, need to read again to reach EOF
-		// TODO: review Read, might need to set a timeout (on top of the Server timeout?)
-		// because i'm unsure where to take care of this at the moment
-		length, err := d.req.Body.Read(bodybuffer[totalBytesRead:])
-		totalBytesRead += int64(length)
-
-		if err != io.EOF && err != nil {
-			d.Err = errors.Join(errors.New("readbody io error: "), err)
-			return false
-		}
-	}
-	if (err == io.EOF && totalBytesRead != d.req.ContentLength) ||
-		(err != io.EOF && totalBytesRead > d.req.ContentLength) {
-		d.Err = fmt.Errorf("read body invalid state (%v)", err)
+	// Server is defined with timeout on connection and request. Request has buffer and size limits. Headers have been checked for size. So should be safe to readall.
+	bodybuffer, err := io.ReadAll(d.req.Body)
+	if err != nil {
+		d.Err = fmt.Errorf("ReadAll(req.Body) failed: %v", err)
 		return false
 	}
-
-	d.body = append(make([]byte, 0), bodybuffer[:totalBytesRead]...) // TODO: review slice memory, copy slice to free memory?
+	if len(bodybuffer) != int(d.req.ContentLength) {
+		d.Err = fmt.Errorf("ReadAll(req.Body) buffer length(%v) != ContentLength(%v)", len(bodybuffer), d.req.ContentLength)
+		return false
+	}
+	// err == nil && len == contentlength
+	d.body = bodybuffer
 	return true
 }
 

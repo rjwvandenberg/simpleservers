@@ -12,16 +12,18 @@ import (
 )
 
 const (
-	port            = 8080
-	timeoutMs       = 5000
-	maxHeaderLength = 4096 // guessed
-	noStatusCode    = -1
+	port                = 8080
+	connectionTimeoutMs = 10000
+	requestTimeoutMs    = 5000
+	maxHeaderLength     = 4096 // guessed
+	noStatusCode        = -1
 )
 
 // Github Webhook docs:
 // https://docs.github.com/en/webhooks
+// Assumption loadbalancer is transcoding http2 to http1
 func main() {
-	log.Println("Starting github webhooks server...")
+	log.Println("Starting github webhooks server (http1)...")
 
 	validationHandlers := make(map[string]webhookValidationHandler)
 	for _, obj := range []struct {
@@ -32,14 +34,18 @@ func main() {
 		validationHandlers[obj.path] = webhookValidationHandler{obj.path, secrets.New(obj.path, []byte(obj.secret))}
 	}
 
-	// TODO: review how the timeouts interact exactly, encountered a read for EOF that would block for more data when Content-Length == body.length in delivery.ReadBody
-	// In the meantime, added a TimeoutHandler to ensure the connection closes
+	// TimeoutHandler will limit the time in serveHTTP and return 503 <msg> if exceeded, by attaching a cancel context to the http.Request
+	// MaxBytesHandler uses a MaxBytesReader to wrap the request.Body io.Reader to limit the size of a request body. It is a 32kb buffered reader
+	// A good writeup on timeout considerations https://adam-p.ca/blog/2022/01/golang-http-server-timeouts/
+	// and check the source by following server.ListenAndServe
 	server := http.Server{
 		Addr:         fmt.Sprintf(":%v", port),
-		Handler:      http.TimeoutHandler(http.MaxBytesHandler(webhookRequestHandler{validationHandlers}, maxHeaderLength+gh.MaxBodyLength), timeoutMs*time.Millisecond, "yap timeout"),
-		ReadTimeout:  timeoutMs * time.Millisecond,
-		WriteTimeout: timeoutMs * time.Millisecond,
-		IdleTimeout:  timeoutMs * time.Millisecond,
+		Handler:      http.TimeoutHandler(http.MaxBytesHandler(webhookRequestHandler{validationHandlers}, maxHeaderLength+gh.MaxBodyLength), requestTimeoutMs*time.Millisecond, "<!DOCTYPE html><html><body>connection timed out</body></html>"),
+		ReadTimeout:  connectionTimeoutMs * time.Millisecond, // Max time for header+body read (per connection)
+		WriteTimeout: connectionTimeoutMs * time.Millisecond, // Max time for response write (per connection) resets on receiving new request
+		// IdleTimeout:  timeoutMs * time.Millisecond,	// Max wait time for next request, uses ReadTimeout if 0.
+		MaxHeaderBytes: maxHeaderLength, // Default 1MB
+		// ErrorLog: ,									// Default is log.Print* functions
 	}
 
 	log.Printf("Listening to requests on :%v", port)
