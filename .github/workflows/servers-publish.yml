@@ -1,3 +1,5 @@
+# TODO: review caching
+
 name: Publish simpleservers
 # multiplatform docs: https://docs.docker.com/build/ci/github-actions/multi-platform/
 on:
@@ -53,6 +55,15 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ghcr.io/rjwvandenberg/static-file-server:latest
+
+      - name: B&P github-webhook-server
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: github-webhook-server/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ghcr.io/rjwvandenberg/github-webhook-server:latest
 
       #- name: Build static-file-server:latest image
       #  run: docker build -t ghcr.io/rjwvandenberg/static-file-server:latest -f static-file-server/Dockerfile .

@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"strings"
 	"time"
 
 	gh "github.com/rjwvandenberg/simpleservers/github-webhook-server/gh"
@@ -25,14 +27,7 @@ const (
 func main() {
 	log.Println("Starting github webhooks server (http1)...")
 
-	validationHandlers := make(map[string]webhookValidationHandler)
-	for _, obj := range []struct {
-		path   string
-		secret string
-	}{{"/testa/", "A"}, {"/testb/", "B"}} {
-		log.Printf("added: %v webhook handler ", obj.path)
-		validationHandlers[obj.path] = webhookValidationHandler{obj.path, secrets.New(obj.path, []byte(obj.secret))}
-	}
+	validationHandlers := getHandlers()
 
 	// TimeoutHandler will limit the time in serveHTTP and return 503 <msg> if exceeded, by attaching a cancel context to the http.Request
 	// MaxBytesHandler uses a MaxBytesReader to wrap the request.Body io.Reader to limit the size of a request body. It is a 32kb buffered reader
@@ -50,6 +45,39 @@ func main() {
 
 	log.Printf("Listening to requests on :%v", port)
 	server.ListenAndServe()
+}
+
+// env var SECRETS is a comma seperated list of path,base64(secret),path,base64(secret),.... webhooks
+// so SECRETS=testa,A,testb,B gets converted into
+// <domain>/testa/  authorized with secret A
+// <domain>/testb/  authorized with secret B
+func getHandlers() map[string]webhookValidationHandler {
+	defer os.Clearenv()
+
+	for _, ev := range os.Environ() {
+		if split := strings.Split(ev, "="); split[0] == "SECRETS" {
+			return processSecrets(strings.Split(split[1], ","))
+		}
+	}
+
+	log.Panic("failed: did not find SECRETS env variable")
+	return nil
+}
+
+func processSecrets(envSecrets []string) map[string]webhookValidationHandler {
+	if len(envSecrets)%2 != 0 {
+		log.Panic("failed: secrets slice length is odd")
+	}
+
+	handlers := make(map[string]webhookValidationHandler)
+	for i := range len(envSecrets) / 2 {
+		path := fmt.Sprintf("/%v/", strings.TrimSpace(envSecrets[2*i]))
+		secret := strings.TrimSpace(envSecrets[2*i+1])
+		log.Printf("added: %v webhook handler", path)
+		handlers[path] = webhookValidationHandler{path, secrets.New(path, []byte(secret))}
+	}
+
+	return handlers
 }
 
 type webhookRequestHandler struct {
@@ -103,5 +131,5 @@ type DeliveryHandler struct {
 }
 
 func (d DeliveryHandler) process() {
-	log.Printf("accepted delivery %v", d.delivery.Type())
+	log.Printf("accepted: delivery '%v'", d.delivery.Type())
 }
