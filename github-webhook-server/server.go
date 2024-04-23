@@ -1,10 +1,12 @@
 package main
 
 import (
+	"bytes"
 	"encoding/hex"
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -21,10 +23,35 @@ const (
 	noStatusCode        = -1
 )
 
+type handlerConstructor func(d gh.Delivery) DeliveryHandler
+
+var nextHandlerConstructor handlerConstructor = func(d gh.Delivery) DeliveryHandler {
+	return DefaultDeliveryHandler{d}
+}
+
 // Github Webhook docs:
 // https://docs.github.com/en/webhooks
 // Assumption loadbalancer is transcoding http2 to http1
 func main() {
+	// TODO: combine envvars/arguments into config and validate FORWARD url
+	for _, ev := range os.Environ() {
+		if s, found := strings.CutPrefix(ev, "FORWARD="); found {
+			url, err := url.ParseRequestURI(s)
+			if err != nil {
+				log.Panicf("ForwardHandlerURI(%v) is not valid: %v", s, err)
+			}
+			_, err = http.DefaultClient.Post(url.String(), "", nil) // this might error for the wrong reasons, need better validation
+			if err != nil {
+				log.Panicf("ForwardHandlerURI(%v) could not be reached", url.String())
+			}
+
+			log.Printf("Forwarding all webhook events to %v", url)
+			nextHandlerConstructor = func(d gh.Delivery) DeliveryHandler {
+				return DeliveryForwardHandler{d, url}
+			}
+		}
+	}
+
 	log.Println("Starting github webhooks server (http1)...")
 
 	validationHandlers := getHandlers()
@@ -122,14 +149,37 @@ func (w webhookValidationHandler) validate(delivery gh.Delivery) {
 	if !w.secret.Validate(delivery.Hash(), delivery.Body()) {
 		log.Printf("refused: %v requesting %v, because invalid signature %v", delivery.Remote(), delivery.Path(), hex.EncodeToString(delivery.Hash()))
 	} else {
-		go DeliveryHandler{delivery}.process()
+		go nextHandlerConstructor(delivery).Process()
 	}
 }
 
-type DeliveryHandler struct {
+type DeliveryHandler interface {
+	Process()
+}
+
+type DefaultDeliveryHandler struct {
 	delivery gh.Delivery
 }
 
-func (d DeliveryHandler) process() {
+func (d DefaultDeliveryHandler) Process() {
 	log.Printf("accepted: delivery '%v'", d.delivery.Type())
+}
+
+type DeliveryForwardHandler struct {
+	delivery gh.Delivery
+	url      *url.URL
+}
+
+func (d DeliveryForwardHandler) Process() {
+	url := d.url.String()
+	hash := hex.EncodeToString(d.delivery.Hash())
+	for i := range 3 { // give it three tries until giving up
+		_, err := http.DefaultClient.Post(url, "application/json", bytes.NewReader(d.delivery.Body()))
+		if err == nil {
+			log.Printf("forwarded: delivery %v to %v after %v POST requests", hash, url, i+1)
+			return
+		}
+		time.Sleep(time.Minute)
+	}
+	log.Printf("error: failed to deliver %v to %v", hash, url)
 }
