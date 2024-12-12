@@ -22,8 +22,7 @@ This implementation uses HMAC-SHA3-512 as its hashing function.
 
 go hash-pbkdf2.go <password> <salt> <iterations>
     Supported encodings for password, salt and output key:
-	- base64 (default)
-`
+	- base64 (default)`
 
 func main() {
 	if len(os.Args) != 4 {
